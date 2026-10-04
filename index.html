@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Bến Dừa — Một mùa hè ở nhà ngoại (Xóm Nước)</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <meta name="theme-color" content="#284c3b">
+  <meta name="description" content="Trải nghiệm tựa game phiêu lưu pixel ấm áp Bến Dừa — Một mùa hè ở nhà ngoại. Tải APK Android chính thức hoặc chơi trực tiếp trên web.">
+  <style>
+    :root {
+      --bg: #1c3629;
+      --card-bg: #234434;
+      --card-border: #386b53;
+      --accent: #65d697;
+      --accent-hover: #4dc280;
+      --text: #f4f7f5;
+      --text-muted: #a7c1b4;
+      --gold: #f6c85f;
+      --btn-green: linear-gradient(135deg, #2e7d32, #43a047);
+      --btn-web: linear-gradient(135deg, #0277bd, #0091ea);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(circle at 50% 0%, #2f5945 0%, #172d22 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 60px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 580px;
+      width: 100%;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .app-icon {
+      width: 110px;
+      height: 110px;
+      border-radius: 24px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5), 0 0 20px rgba(101,214,151,0.25);
+      border: 3px solid #65d697;
+      margin-bottom: 14px;
+      image-rendering: pixelated;
+      background: #284c3b;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: var(--gold);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .badge-bar {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(101, 214, 151, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(101, 214, 151, 0.35);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+
+    .card h2 {
+      font-size: 17px;
+      color: #8be5b3;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p, .card li {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .card ul, .card ol {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    .card li {
+      margin-bottom: 6px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 15px;
+      border-radius: 12px;
+      border: none;
+      font-size: 15.5px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      transition: all 0.2s ease;
+      margin-bottom: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-apk {
+      background: var(--btn-green);
+      border: 1.5px solid #81c784;
+    }
+
+    .btn-web {
+      background: var(--btn-web);
+      border: 1.5px solid #4fc3f7;
+    }
+
+    .highlight {
+      color: var(--gold);
+      font-weight: bold;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .feature-item {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12.5px;
+    }
+
+    .feature-item b {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <img src="icon.png" alt="Bến Dừa Icon" class="app-icon">
+      <h1>🌴 BẾN DỪA</h1>
+      <p><i>Một mùa hè ở nhà ngoại — Thế giới Xóm Nước</i></p>
+      <div class="badge-bar">
+        <span class="badge">🎮 Pixel Art Adventure</span>
+        <span class="badge">📱 Android 8.0+</span>
+        <span class="badge">⚡ 60 FPS</span>
+        <span class="badge">💾 64.5 KB</span>
+      </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="card">
+      <h2>📥 TẢI XUỐNG & TRẢI NGHIỆM</h2>
+      <p style="margin-bottom: 14px; color: var(--text-muted);">
+        Ứng dụng Android APK chính thức đóng gói trực tiếp từ thế giới Bến Dừa, tối ưu chế độ toàn màn hình ngang tràn viền và tăng tốc phần cứng mượt mà.
+      </p>
+
+      <a href="BenDua.apk" download class="btn btn-apk">
+        <span>📲</span>
+        <span>TẢI APK ANDROID (BenDua.apk - 64.5 KB)</span>
+      </a>
+
+      <a href="https://ben-dua.vercel.app/" target="_blank" rel="noopener noreferrer" class="btn btn-web">
+        <span>🌐</span>
+        <span>CHƠI TRỰC TIẾP TRÊN WEB (Vercel)</span>
+      </a>
+    </div>
+
+    <!-- Features -->
+    <div class="card">
+      <h2>✨ TÍNH NĂNG NỔI BẬT TRÊN ANDROID</h2>
+      <div class="feature-grid">
+        <div class="feature-item">
+          <b>📺 Màn Hình Ngang Tràn Viền</b>
+          Tự động xoay ngang cảm biến (Sensor Landscape), ẩn thanh điều hướng ảo mang lại trải nghiệm retro trọn vẹn.
+        </div>
+        <div class="feature-item">
+          <b>⚡ Tăng Tốc Đồ Họa 60 FPS</b>
+          Kích hoạt Hardware Acceleration WebGL và HTML5 Canvas không giật lag.
+        </div>
+        <div class="feature-item">
+          <b>💡 Giữ Sáng Màn Hình</b>
+          Tự động giữ sáng màn hình liên tục khi chơi, không bị khóa máy lúc đang đắm chìm vào cốt truyện.
+        </div>
+        <div class="feature-item">
+          <b>💾 Lưu Game Tự Động</b>
+          Đồng bộ LocalStorage & IndexedDB giúp tiến trình chơi game luôn được lưu an toàn.
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card">
+      <h2>🛠️ HƯỚNG DẪN CÀI ĐẶT APK</h2>
+      <ol>
+        <li>Bấm nút <span class="highlight">TẢI APK ANDROID</span> ở trên để tải file <code>BenDua.apk</code> về máy.</li>
+        <li>Sau khi tải xong, nhấn mở file APK từ thanh thông báo hoặc ứng dụng Tệp (Files).</li>
+        <li>Nếu điện thoại hỏi <i>"Cho phép cài đặt ứng dụng từ nguồn này"</i>, hãy bật <b>Cho phép (Allow)</b>.</li>
+        <li>Nhấn <b>Cài đặt (Install)</b> và thưởng thức game <b>Bến Dừa</b> với biểu tượng cây dừa bến sông!</li>
+      </ol>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="card">
+      <h2>📋 THÔNG SỐ KỸ THUẬT</h2>
+      <ul style="list-style: none; padding-left: 0;">
+        <li>• <b>Tên gói (Package Name):</b> <code>online.bendua.game</code></li>
+        <li>• <b>Phiên bản:</b> <code>1.0.0 (Build 24)</code></li>
+        <li>• <b>Kích thước file:</b> <code>64.5 KB</code></li>
+        <li>• <b>Chữ ký số:</b> <code>APK Signature Scheme v2 & v3 (Valid)</code></li>
+        <li>• <b>Hệ điều hành:</b> <code>Android 8.0 - Android 14/15+</code></li>
+        <li>• <b>Trang web gốc:</b> <a href="https://ben-dua.vercel.app/" target="_blank" style="color: var(--accent);">ben-dua.vercel.app</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>© 2026 <b>Bến Dừa</b> — Xóm Nước. Phát hành mã nguồn & APK mã hóa chính thức.</p>
+      <p style="margin-top: 6px;">
+        <a href="https://github.com/VuNguyen76/BenDua" target="_blank">Kho mã nguồn GitHub: VuNguyen76/BenDua</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
