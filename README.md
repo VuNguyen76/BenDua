@@ -13,11 +13,18 @@
   <img src="icon.png" width="160" alt="Bến Dừa Icon" style="border-radius: 28px;" />
 </p>
 
-## 📱 Tải Xuống Ứng Dụng Android (APK)
+## 📱 Tải Xuống Ứng Dụng (Android & iOS)
 
+### 🤖 Dành cho Android (APK):
 * 📥 **Tải trực tiếp APK chính thức**: [**BenDua.apk** (64.5 KB)](https://vunguyen76.github.io/BenDua/BenDua.apk)
 * 📥 **Bản lưu trữ phiên bản v1.0**: [BenDua_v1.0.apk](https://vunguyen76.github.io/BenDua/BenDua_v1.0.apk)
-* 🌐 **Trang web tải nhanh (GitHub Web / Pages)**: [https://vunguyen76.github.io/BenDua/](https://vunguyen76.github.io/BenDua/)
+
+### 🍏 Dành cho iPhone / iPad (iOS):
+* 📲 **Tải Cấu Hình Ứng Dụng (Apple WebClip Profile)**: [**BenDua.mobileconfig**](https://vunguyen76.github.io/BenDua/BenDua.mobileconfig)
+* ✨ **Cài nhanh qua Safari (Khuyên Dùng)**: Mở [ben-dua.vercel.app](https://ben-dua.vercel.app/) trên **Safari** &rarr; Bấm **Chia sẻ (Share)** &rarr; Chọn **"Thêm vào MH chính" (Add to Home Screen)**.
+* 📦 **Mã nguồn iOS (Swift & GitHub Actions)**: Thư mục `ios/` và `.github/workflows/build-ios.yml` tự động build file `.ipa`.
+
+* 🌐 **Trang web cài đặt (GitHub Pages)**: [https://vunguyen76.github.io/BenDua/](https://vunguyen76.github.io/BenDua/)
 * 🎮 **Chơi trực tiếp trên trình duyệt**: [https://ben-dua.vercel.app/](https://ben-dua.vercel.app/)
 
 ---
