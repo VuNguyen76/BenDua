@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Câu Rùa & Tự Động Đi Bán - Bến Dừa
 // @namespace    https://ben-dua.vercel.app/
-// @version      2.1
+// @version      3.0
 // @description  Tự động câu rùa chuẩn 100% tại Hồ Gươm, tự động đi tìm Cô Thu bán rùa khi đầy giỏ và tự quay lại hồ câu tiếp
 // @match        https://ben-dua.vercel.app/*
 // @match        https://vunguyen76.github.io/BenDua/*
@@ -11,20 +11,20 @@
 (function() {
   'use strict';
 
-  // Định nghĩa mã phím chuẩn theo Phaser KeyboardPlugin
-  const KEY_DEFS = {
-    KeyW: { key: 'w', keyCode: 87, which: 87 },
-    KeyA: { key: 'a', keyCode: 65, which: 65 },
-    KeyS: { key: 's', keyCode: 83, which: 83 },
-    KeyD: { key: 'd', keyCode: 68, which: 68 },
-    ShiftLeft: { key: 'Shift', keyCode: 16, which: 16 },
-    KeyE: { key: 'e', keyCode: 69, which: 69 },
-    Space: { key: ' ', keyCode: 32, which: 32 },
-    Escape: { key: 'Escape', keyCode: 27, which: 27 }
+  // Khai báo bảng mã keyCode chuẩn Phaser
+  const KEY_CODES = {
+    KeyW: 87,
+    KeyA: 65,
+    KeyS: 83,
+    KeyD: 68,
+    ShiftLeft: 16,
+    KeyE: 69,
+    Space: 32,
+    Escape: 27
   };
 
   // Trạng thái bot
-  // 'IDLE' | 'FISHING' | 'WALKING_TO_MERCHANT' | 'SELLING' | 'WALKING_TO_LAKE' | 'ADJUSTING_FACING'
+  // 'IDLE' | 'FISHING' | 'WALKING_TO_MERCHANT' | 'SELLING' | 'WALKING_TO_LAKE'
   let state = 'IDLE';
   let isRunning = false;
   let autoSellEnabled = true;
@@ -32,20 +32,42 @@
   let caughtInBag = 0;
   let totalCaughtAllTime = 0;
 
-  // Thời gian chạy thực tế giữa bờ hồ và Cô Thu (mặc định 2200ms)
-  let walkDurationMs = 2200;
-  let walkStartTime = 0;
+  let animFrameId = null;
   let lastActionTime = 0;
   let hitCooldown = false;
-  let animFrameId = null;
+  let walkStartTime = 0;
+  let isNavigating = false;
 
   const activeKeys = new Set();
 
-  // === HỆ THỐNG GỬI SỰ KIỆN BÀN PHÍM CHUẨN PHASER ===
+  // === ĐỌC TRẠNG THÁI REAL-TIME TỪ GAME LOCALSTORAGE ===
+  function getGameAccountKey() {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('xom-nuoc-demo-v1:account:')) {
+        return k;
+      }
+    }
+    return null;
+  }
+
+  function getPlayerData() {
+    const key = getGameAccountKey();
+    if (!key) return null;
+    try {
+      return JSON.parse(localStorage.getItem(key) || '{}');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // === GỬI SỰ KIỆN BÀN PHÍM CHUẨN PHASER ENGINE ===
   function sendKeyEvent(type, code) {
-    const def = KEY_DEFS[code] || { key: code, keyCode: 0, which: 0 };
+    const keyCode = KEY_CODES[code] || 0;
+    const key = code === 'Space' ? ' ' : code.startsWith('Key') ? code.replace('Key', '').toLowerCase() : code;
+
     const evt = new KeyboardEvent(type, {
-      key: def.key,
+      key: key,
       code: code,
       bubbles: true,
       cancelable: true,
@@ -53,9 +75,8 @@
       view: window
     });
 
-    // Ép buộc thuộc tính keyCode và which để Phaser KeyboardPlugin nhận diện
-    Object.defineProperty(evt, 'keyCode', { value: def.keyCode, writable: false });
-    Object.defineProperty(evt, 'which', { value: def.which, writable: false });
+    Object.defineProperty(evt, 'keyCode', { value: keyCode, writable: false });
+    Object.defineProperty(evt, 'which', { value: keyCode, writable: false });
 
     window.dispatchEvent(evt);
     document.dispatchEvent(evt);
@@ -88,7 +109,11 @@
     setTimeout(() => releaseKey(code), duration);
   }
 
-  // === KIỂM TRA PROMPT TƯƠNG TÁC (THẢ CÂU / CÔ THU) ===
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // === KIỂM TRA NÚT TƯƠNG TÁC (PROMPT) TRÊN HUD ===
   function getNearbyPrompt() {
     const prompt = document.getElementById('prompt');
     const label = document.getElementById('prompt-label');
@@ -117,28 +142,25 @@
     tapKey('Space', 60);
   }
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   // === TẠO GIAO DIỆN BẢNG ĐIỀU KHIỂN NỔI (FLOATING HUD) ===
   const hud = document.createElement('div');
   hud.id = 'auto-fishing-merchant-hud';
   hud.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-      <span style="font-weight: bold; font-size: 13.5px; color: #ffd54f;">🐢 AUTO CÂU & BÁN RÙA V2.1</span>
+      <span style="font-weight: bold; font-size: 13.5px; color: #ffd54f;">🐢 AUTO CÂU & BÁN RÙA V3.0</span>
       <span id="af-badge" style="font-size: 11px; font-weight: bold; background: #444; padding: 2px 6px; border-radius: 4px; color: #fff;">OFF</span>
     </div>
 
-    <div style="background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; line-height: 1.5;">
+    <div style="background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 11.5px; line-height: 1.5;">
       <div>Trạng thái: <b id="af-status" style="color: #4ade80;">Sẵn sàng</b></div>
-      <div>Phát hiện: <b id="af-prompt-view" style="color: #f43f5e;">Chưa có mục tiêu</b></div>
+      <div>Vị trí: <span id="af-pos" style="color: #cbd5e1;">X: - | Y: -</span></div>
+      <div>Mục tiêu: <b id="af-prompt-view" style="color: #38bdf8;">-</b></div>
       <div>Giỏ hiện tại: <b id="af-bag-count" style="color: #38bdf8;">0</b> / <span id="af-threshold-val">10</span> con</div>
-      <div>Tổng đã câu: <b id="af-total-count" style="color: #facc15;">0</b> con</div>
+      <div>Tiền ví: <b id="af-money" style="color: #facc15;">-</b></div>
     </div>
 
-    <!-- Tùy chọn đi bán & thời gian di chuyển -->
-    <div style="margin-bottom: 6px; font-size: 11.5px; display: flex; align-items: center; justify-content: space-between;">
+    <!-- Tùy chọn đi bán -->
+    <div style="margin-bottom: 8px; font-size: 11.5px; display: flex; align-items: center; justify-content: space-between;">
       <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
         <input type="checkbox" id="af-opt-sell" checked style="cursor: pointer;">
         <span>Tự đi bán khi đủ:</span>
@@ -150,15 +172,6 @@
         <option value="50">50 con</option>
         <option value="100">100 con (Đầy giỏ)</option>
       </select>
-    </div>
-
-    <div style="margin-bottom: 8px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; color: #cbd5e1;">
-      <span>Thời gian chạy bộ:</span>
-      <div style="display: flex; align-items: center; gap: 4px;">
-        <button id="af-time-dec" style="padding: 1px 6px; background: #334155; border: none; color: #fff; border-radius: 3px; cursor: pointer;">-</button>
-        <span id="af-time-display" style="font-weight: bold; color: #38bdf8;">2.2s</span>
-        <button id="af-time-inc" style="padding: 1px 6px; background: #334155; border: none; color: #fff; border-radius: 3px; cursor: pointer;">+</button>
-      </div>
     </div>
 
     <!-- Nút điều khiển chính -->
@@ -174,18 +187,8 @@
       </button>
     </div>
 
-    <!-- Nút test kiểm tra di chuyển -->
-    <div style="display: flex; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px;">
-      <button id="af-test-step" style="flex: 1; padding: 4px; background: #334155; border: none; color: #cbd5e1; border-radius: 3px; cursor: pointer; font-size: 10px;">
-        Test bước đi (1 bước)
-      </button>
-      <button id="af-turn-lake" style="flex: 1; padding: 4px; background: #334155; border: none; color: #cbd5e1; border-radius: 3px; cursor: pointer; font-size: 10px;">
-        Quay mặt ra hồ
-      </button>
-    </div>
-
-    <div style="font-size: 9.5px; color: #94a3b8; margin-top: 6px; line-height: 1.3;">
-      * Đứng mép hồ Hồ Gươm quay mặt ra nước, nút "Thả câu" sáng lên rồi bấm BẬT AUTO.
+    <div style="font-size: 9.5px; color: #94a3b8; line-height: 1.3;">
+      * Đứng mép hồ Hồ Gươm quay mặt ra nước, bấm BẬT AUTO để tự động câu & tự đi bán rùa vòng lặp!
     </div>
   `;
 
@@ -209,9 +212,10 @@
   document.body.appendChild(hud);
 
   const statusEl = hud.querySelector('#af-status');
+  const posEl = hud.querySelector('#af-pos');
   const promptViewEl = hud.querySelector('#af-prompt-view');
   const bagCountEl = hud.querySelector('#af-bag-count');
-  const totalCountEl = hud.querySelector('#af-total-count');
+  const moneyEl = hud.querySelector('#af-money');
   const badgeEl = hud.querySelector('#af-badge');
   const toggleBtn = hud.querySelector('#af-toggle-btn');
   const optSell = hud.querySelector('#af-opt-sell');
@@ -219,11 +223,6 @@
   const thresholdVal = hud.querySelector('#af-threshold-val');
   const forceSellBtn = hud.querySelector('#af-force-sell-btn');
   const forceLakeBtn = hud.querySelector('#af-force-lake-btn');
-  const testStepBtn = hud.querySelector('#af-test-step');
-  const turnLakeBtn = hud.querySelector('#af-turn-lake');
-  const timeDecBtn = hud.querySelector('#af-time-dec');
-  const timeIncBtn = hud.querySelector('#af-time-inc');
-  const timeDisplay = hud.querySelector('#af-time-display');
 
   optThreshold.onchange = () => {
     sellThreshold = parseInt(optThreshold.value, 10);
@@ -234,30 +233,6 @@
     autoSellEnabled = optSell.checked;
   };
 
-  timeDecBtn.onclick = () => {
-    walkDurationMs = Math.max(1000, walkDurationMs - 200);
-    timeDisplay.textContent = (walkDurationMs / 1000).toFixed(1) + 's';
-  };
-
-  timeIncBtn.onclick = () => {
-    walkDurationMs = Math.min(5000, walkDurationMs + 200);
-    timeDisplay.textContent = (walkDurationMs / 1000).toFixed(1) + 's';
-  };
-
-  testStepBtn.onclick = () => {
-    // Thử bước 1 bước xuống phía dưới
-    pressKey('KeyS');
-    setTimeout(() => {
-      releaseKey('KeyS');
-    }, 200);
-  };
-
-  turnLakeBtn.onclick = () => {
-    // Quay mặt lên hướng Bắc ra hồ
-    pressKey('KeyW');
-    setTimeout(() => releaseKey('KeyW'), 100);
-  };
-
   function updateStatus(text, color = '#4ade80') {
     if (statusEl) {
       statusEl.textContent = text;
@@ -265,64 +240,158 @@
     }
   }
 
-  // === CHẠY ĐẾN CÔ THU (HƯỚNG NAM XUỐNG DƯỚI) ===
-  function startWalkingToMerchant() {
+  // === THUẬT TOÁN ĐI ĐẾN CÔ THU THEO TỌA ĐỘ REAL-TIME ===
+  async function walkToMerchant() {
+    if (isNavigating) return;
+    isNavigating = true;
     state = 'WALKING_TO_MERCHANT';
-    walkStartTime = performance.now();
-    updateStatus('Đang chạy đến Cô Thu…', '#38bdf8');
+    updateStatus('Đang đi tới Cô Thu…', '#38bdf8');
     releaseAllKeys();
 
-    // Giữ phím S (Down), A (Trái nhẹ), Shift (Chạy nhanh)
+    const start = performance.now();
+    // Bước 1: Đi xuống (S) cho tới khi y >= 640
     pressKey('KeyS');
-    pressKey('KeyA');
-    pressKey('ShiftLeft');
+
+    while (performance.now() - start < 5000) {
+      const p = getPlayerData();
+      const prompt = getNearbyPrompt();
+
+      // Kiểm tra nếu đã thấy Cô Thu trong bán kính tương tác
+      if (prompt.includes('Cô Thu') || prompt.includes('thu mua rùa')) {
+        break;
+      }
+
+      if (p && p.y >= 640) {
+        // Đã đến ngang tầm Y của Cô Thu
+        break;
+      }
+      await sleep(50);
+    }
+    releaseKey('KeyS');
+
+    // Bước 2: Chỉnh nhẹ X nếu cần
+    const p1 = getPlayerData();
+    if (p1) {
+      if (p1.x > 675) {
+        pressKey('KeyA');
+        await sleep(200);
+        releaseKey('KeyA');
+      } else if (p1.x < 650) {
+        pressKey('KeyD');
+        await sleep(200);
+        releaseKey('KeyD');
+      }
+    }
+
+    await sleep(200);
+    releaseAllKeys();
+
+    // Bước 3: Thực hiện bán rùa
+    await performSellingProcess();
+    isNavigating = false;
   }
 
-  // === CHẠY VỀ BỜ HỒ (HƯỚNG BẮC LÊN TRÊN) ===
-  function startWalkingToLake() {
+  // === THUẬT TOÁN ĐI VỀ BỜ HỒ THEO TỌA ĐỘ REAL-TIME & XOAY MẶT RA NƯỚC ===
+  async function walkToLake() {
+    if (isNavigating) return;
+    isNavigating = true;
     state = 'WALKING_TO_LAKE';
-    walkStartTime = performance.now();
-    updateStatus('Đang chạy về bờ hồ…', '#818cf8');
+    updateStatus('Đang về bờ hồ…', '#818cf8');
     releaseAllKeys();
 
-    // Giữ phím W (Up), D (Phải nhẹ), Shift (Chạy nhanh)
+    const start = performance.now();
+    // Đi lên phía bờ hồ (W) cho tới khi y <= 618
     pressKey('KeyW');
+
+    while (performance.now() - start < 5000) {
+      const p = getPlayerData();
+      const prompt = getNearbyPrompt();
+
+      if (prompt.includes('Thả câu')) {
+        break;
+      }
+
+      if (p && p.y <= 618) {
+        break;
+      }
+      await sleep(50);
+    }
+    releaseKey('KeyW');
+
+    // Chỉnh X về phía lan can hồ (x tầm 675 ~ 690)
+    const p2 = getPlayerData();
+    if (p2 && p2.x < 675) {
+      pressKey('KeyD');
+      await sleep(200);
+      releaseKey('KeyD');
+    }
+
+    await sleep(200);
+
+    // BƯỚC QUAN TRỌNG NHẤT: Xoay mặt sang phải (D) hướng ra mặt hồ Hồ Gươm
+    updateStatus('Xoay mặt ra hồ…', '#38bdf8');
     pressKey('KeyD');
-    pressKey('ShiftLeft');
+    await sleep(150);
+    releaseKey('KeyD');
+    await sleep(300);
+
+    releaseAllKeys();
+
+    // Kiểm tra nút Thả câu
+    const prompt = getNearbyPrompt();
+    if (prompt.includes('Thả câu')) {
+      updateStatus('Đã vào bến câu! Thả câu…', '#4ade80');
+      state = 'FISHING';
+      lastActionTime = performance.now();
+      triggerInteract();
+    } else {
+      // Nếu chưa hiện, nhích nhẹ 1 nhịp ngắn
+      pressKey('KeyD');
+      await sleep(80);
+      releaseKey('KeyD');
+      await sleep(200);
+      state = 'FISHING';
+      if (getNearbyPrompt().includes('Thả câu')) {
+        triggerInteract();
+      }
+    }
+
+    isNavigating = false;
   }
 
   // === THỰC HIỆN BÁN RÙA TẠI QUẦY CÔ THU ===
   async function performSellingProcess() {
     state = 'SELLING';
     releaseAllKeys();
-    updateStatus('Đang nói chuyện với Cô Thu…', '#fbbf24');
+    updateStatus('Đang mở quầy Cô Thu…', '#fbbf24');
 
+    // Click nút tương tác E
     triggerInteract();
-    await sleep(700);
+    await sleep(600);
 
-    // Bấm nút "Bán rùa trong giỏ" (testId: turtle-merchant-bag)
+    // 1. Click "Bán rùa trong giỏ" (testId: turtle-merchant-bag)
     const bagBtn = document.querySelector('button[data-testid="turtle-merchant-bag"]') ||
                    Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Bán rùa trong giỏ'));
     if (bagBtn) {
       bagBtn.click();
-      await sleep(700);
+      await sleep(600);
     }
 
-    // Bấm nút "Bán tất cả rùa trong giỏ" (testId: sell-caught-all)
+    // 2. Click "Bán rùa trong giỏ · ...đ" (testId: sell-caught-all)
     const sellAllBtn = document.querySelector('button[data-testid="sell-caught-all"]') ||
                        Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Bán') && b.textContent.includes('trong giỏ'));
     if (sellAllBtn && !sellAllBtn.disabled) {
-      updateStatus('Đã bán hết rùa!', '#4ade80');
+      updateStatus('Đang bán sạch rùa…', '#4ade80');
       sellAllBtn.click();
-      await sleep(700);
+      await sleep(600);
       caughtInBag = 0;
       bagCountEl.textContent = '0';
     } else {
       updateStatus('Giỏ rùa đã trống.', '#94a3b8');
-      await sleep(400);
+      await sleep(300);
     }
 
-    // Đóng dialog (nút close-dialog hoặc phím Escape)
+    // 3. Đóng dialog (nút close-dialog hoặc Escape)
     const closeBtn = document.querySelector('button.close-dialog') ||
                      Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Đóng');
     if (closeBtn) {
@@ -330,44 +399,10 @@
     } else {
       tapKey('Escape', 100);
     }
-    await sleep(600);
+    await sleep(500);
 
     // Bán xong -> chạy ngược về hồ
-    startWalkingToLake();
-  }
-
-  // === QUY TRÌNH XOAY MẶT & BẮT ĐẦU CÂU TẠI BỜ HỒ ===
-  async function adjustAndStartFishing() {
-    state = 'ADJUSTING_FACING';
-    releaseAllKeys();
-    updateStatus('Đang quay mặt ra hồ…', '#38bdf8');
-
-    // Nhấp phím W để nhân vật quay mặt về hướng Bắc nhìn ra mặt hồ
-    pressKey('KeyW');
-    await sleep(100);
-    releaseKey('KeyW');
-    await sleep(300);
-
-    // Kiểm tra nếu nút "Thả câu" đã sáng lên
-    let prompt = getNearbyPrompt();
-    if (!prompt.includes('Thả câu')) {
-      // Nhích nhẹ thêm 1 nhịp ngắn để đứng sát mép nước hơn
-      pressKey('KeyW');
-      await sleep(120);
-      releaseKey('KeyW');
-      await sleep(300);
-    }
-
-    prompt = getNearbyPrompt();
-    if (prompt.includes('Thả câu')) {
-      updateStatus('Đã vào bến câu! Thả câu…', '#4ade80');
-      state = 'FISHING';
-      lastActionTime = performance.now();
-      triggerInteract();
-    } else {
-      updateStatus('Hãy đứng lại gần mép hồ một chút', '#f87171');
-      state = 'FISHING';
-    }
+    await walkToLake();
   }
 
   // === VÒNG LẶP ĐIỀU KHIỂN CHÍNH (MAIN LOOP) ===
@@ -376,94 +411,56 @@
 
     const now = performance.now();
     const promptText = getNearbyPrompt();
+    const pData = getPlayerData();
 
-    // Hiển thị trực tiếp mục tiêu đang phát hiện
+    // Cập nhật telemetry lên HUD
+    if (pData) {
+      posEl.textContent = `X: ${Math.round(pData.x)} | Y: ${Math.round(pData.y)} (${pData.facing || '-'})`;
+      moneyEl.textContent = Number(pData.money || 0).toLocaleString('vi-VN') + 'đ';
+      if (pData.fishing?.bag) {
+        caughtInBag = pData.fishing.bag.length;
+        bagCountEl.textContent = caughtInBag;
+      }
+    }
+
     if (promptViewEl) {
       promptViewEl.textContent = promptText || 'Không có mục tiêu';
       promptViewEl.style.color = promptText.includes('Thả câu') ? '#38bdf8' :
                                 promptText.includes('Cô Thu') ? '#4ade80' : '#94a3b8';
     }
 
+    // Nếu đang trong quá trình di chuyển hoặc bán thì chờ
+    if (isNavigating || state === 'WALKING_TO_MERCHANT' || state === 'WALKING_TO_LAKE' || state === 'SELLING') {
+      animFrameId = requestAnimationFrame(mainLoop);
+      return;
+    }
+
     const fishingPanel = document.querySelector('.fishing-panel');
     const isFishingActive = fishingPanel && !fishingPanel.hidden;
 
-    // --- TRẠNG THÁI: DI CHUYỂN ĐẾN CÔ THU ---
-    if (state === 'WALKING_TO_MERCHANT') {
-      const elapsed = now - walkStartTime;
-
-      // 1. Nếu phát hiện thấy Cô Thu trong tầm
-      if (promptText.includes('Cô Thu') || promptText.includes('thu mua rùa')) {
-        releaseAllKeys();
-        performSellingProcess();
-        animFrameId = requestAnimationFrame(mainLoop);
-        return;
-      }
-
-      // 2. Nếu đã chạy hết thời gian cài đặt
-      if (elapsed >= walkDurationMs) {
-        releaseAllKeys();
-        // Kiểm tra lại xem đã đứng gần chưa
-        if (promptText.includes('Cô Thu') || promptText.includes('thu mua rùa')) {
-          performSellingProcess();
-        } else {
-          // Thử nhích nhẹ 1 nhịp sang trái
-          pressKey('KeyA');
-          setTimeout(() => {
-            releaseKey('KeyA');
-            if (getNearbyPrompt().includes('Cô Thu')) {
-              performSellingProcess();
-            } else {
-              updateStatus('Chưa tới quầy Cô Thu (tăng thời gian chạy)', '#f87171');
-            }
-          }, 300);
-        }
-        animFrameId = requestAnimationFrame(mainLoop);
-        return;
-      }
-    }
-
-    // --- TRẠNG THÁI: DI CHUYỂN VỀ BỜ HỒ ---
-    else if (state === 'WALKING_TO_LAKE') {
-      const elapsed = now - walkStartTime;
-
-      // 1. Nếu đã thấy "Thả câu"
-      if (promptText.includes('Thả câu')) {
-        adjustAndStartFishing();
-        animFrameId = requestAnimationFrame(mainLoop);
-        return;
-      }
-
-      // 2. Nếu đã chạy hết thời gian cài đặt
-      if (elapsed >= walkDurationMs) {
-        adjustAndStartFishing();
-        animFrameId = requestAnimationFrame(mainLoop);
-        return;
-      }
-    }
-
     // --- TRẠNG THÁI: CÂU RÙA ---
-    else if (state === 'FISHING' || state === 'IDLE') {
+    if (state === 'FISHING' || state === 'IDLE') {
       if (state === 'IDLE') state = 'FISHING';
 
       // Kiểm tra nếu giỏ đã đủ số lượng cần đi bán
       if (autoSellEnabled && caughtInBag >= sellThreshold) {
         if (!isFishingActive) {
-          startWalkingToMerchant();
+          walkToMerchant();
           animFrameId = requestAnimationFrame(mainLoop);
           return;
         }
       }
 
       if (!isFishingActive) {
-        // Chưa quăng cần: Thả câu
+        // Chưa quăng cần: Thả câu nếu nút Thả câu đang sáng
         if (promptText.includes('Thả câu')) {
           updateStatus('Đang quăng cần…', '#38bdf8');
-          if (now - lastActionTime > 1300) {
+          if (now - lastActionTime > 1200) {
             lastActionTime = now;
             triggerInteract();
           }
         } else {
-          updateStatus('Cần đứng mép hồ quay mặt ra nước', '#fbbf24');
+          updateStatus('Chờ nút Thả câu…', '#fbbf24');
         }
       } else {
         // Đang trong trận câu
@@ -483,7 +480,6 @@
           const targetWidth = parseFloat(target.style.width) || 0;
           const currentPos = parseFloat(meter.getAttribute('aria-valuenow')) || 0;
 
-          // Căn trúng vùng xanh chuẩn xác
           const safeStart = targetLeft + 1;
           const safeEnd = targetLeft + targetWidth - 1;
 
@@ -498,16 +494,13 @@
           const msg = bubble?.textContent || 'Đã câu được rùa!';
           updateStatus(msg, '#60a5fa');
           if (now - lastActionTime > 2500) {
-            caughtInBag++;
             totalCaughtAllTime++;
-            bagCountEl.textContent = caughtInBag;
-            totalCountEl.textContent = totalCaughtAllTime;
             lastActionTime = now;
 
             // Kiểm tra ngay sau khi bắt: Nếu đủ số lượng thì chuyển sang đi bán
-            if (autoSellEnabled && caughtInBag >= sellThreshold) {
+            if (autoSellEnabled && (caughtInBag + 1) >= sellThreshold) {
               setTimeout(() => {
-                if (isRunning) startWalkingToMerchant();
+                if (isRunning) walkToMerchant();
               }, 1200);
             }
           }
@@ -538,6 +531,7 @@
       badgeEl.textContent = 'OFF';
       badgeEl.style.backgroundColor = '#444';
       state = 'IDLE';
+      isNavigating = false;
       releaseAllKeys();
       updateStatus('Đã dừng', '#9ca3af');
       if (animFrameId) cancelAnimationFrame(animFrameId);
@@ -553,7 +547,7 @@
       badgeEl.style.backgroundColor = '#16a34a';
       mainLoop();
     }
-    startWalkingToMerchant();
+    walkToMerchant();
   };
 
   forceLakeBtn.onclick = () => {
@@ -565,8 +559,8 @@
       badgeEl.style.backgroundColor = '#16a34a';
       mainLoop();
     }
-    startWalkingToLake();
+    walkToLake();
   };
 
-  console.log('%c[Auto BenDua V2.1] Script Auto Câu Rùa & Tự Bán đã sẵn sàng!', 'color: #eab308; font-size: 14px; font-weight: bold;');
+  console.log('%c[Auto BenDua V3.0] Auto Câu & Bán Rùa closed-loop telemetry đã sẵn sàng!', 'color: #eab308; font-size: 14px; font-weight: bold;');
 })();
