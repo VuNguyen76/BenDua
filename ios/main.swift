@@ -26,7 +26,7 @@ class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         
         view.addSubview(webView)
         
-        if let url = URL(string: "https://ben-dua.vercel.app/") {
+        if let url = URL(string: "https://vietmongky.online/") {
             let request = URLRequest(url: url)
             webView.load(request)
         }
